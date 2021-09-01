@@ -17,4 +17,5 @@ glutin = "0.26.0"
 gl = "0.10.0"
 rustic_gl = "0.3.2"
 derive_builder = "0.10.0-alpha"
-nokhwa = { version = "0.3.2", features = ["input-v4l"] }
+#nokhwa = { git = "https://github.com/l1npengtul/nokhwa", features = ["input-msmf"] }
+opencv = { version = "0.53.2", feature = "clang-runtime"}

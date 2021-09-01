@@ -8,18 +8,23 @@ use mini_gl_fb::BufferFormat;
 use mini_gl_fb::glutin::event_loop::EventLoop;
 use mini_gl_fb::glutin::dpi::LogicalSize;
 
-use nokhwa::{Camera, CameraFormat, FrameFormat, CaptureAPIBackend};
+use opencv::{
+    core::{Mat, Vec3b},
+    prelude::*,
+    Result,
+    videoio,
+};
 
+fn main() -> Result<()> {
 
-fn main() {
-
-    let mut camera = Camera::new(
-        0, // index
-        Some(CameraFormat::new_from(640, 480, FrameFormat::YUYV, 30)),
-        CaptureAPIBackend::Video4Linux,
-    )
-    .unwrap();
-    camera.open_stream().unwrap();
+    #[cfg(ocvrs_opencv_branch_32)]
+    let mut cam = videoio::VideoCapture::new_default(0)?; // 0 is the default camera
+    #[cfg(not(ocvrs_opencv_branch_32))]
+    let mut cam = videoio::VideoCapture::new(0, videoio::CAP_ANY)?; // 0 is the default camera
+    let opened = videoio::VideoCapture::is_opened(&cam)?;
+    if !opened {
+            panic!("Unable to open default camera!");
+    }
 
     let mut event_loop = EventLoop::new();
     let mut fb = mini_gl_fb::get_fancy(config! {
@@ -30,8 +35,8 @@ fn main() {
         resizable: false
     }, &event_loop);
 
-    fb.change_buffer_format::<u8>(BufferFormat::RGB);
-    let mut buffer = vec![0; 640*480*3];
+    fb.change_buffer_format::<u8>(BufferFormat::RGBA);
+    let mut buffer = vec![0; 640*480*4];
 
     let mut update_id: Option<u32> = None;
 
@@ -42,7 +47,22 @@ fn main() {
             update_id = Some(input.schedule_wakeup(Instant::now() + Duration::from_millis(5)))
         } else if let Some(mut wakeup) = input.wakeup {
             if Some(wakeup.id) == update_id {
-                camera.frame_to_buffer(&mut buffer, false);
+                let mut frame = Mat::default();
+                cam.read(&mut frame);
+                let frame_data_vec = Mat::data_typed::<Vec3b>(&frame);
+                let mut offset = 0;
+
+                if let Ok(data) = frame_data_vec {
+                    for pixel in data {
+                        let pixel_slice = &**pixel;
+                            buffer[offset] = pixel_slice[2];
+                            buffer[offset+1] = pixel_slice[1];
+                            buffer[offset+2] = pixel_slice[0];
+                            buffer[offset+3] = 128;
+                            offset += 4;
+                    }
+                }
+
                 fb.update_buffer(&buffer);
 
                 wakeup.when = Instant::now() + Duration::from_millis(5);
@@ -62,4 +82,5 @@ fn main() {
     });
 
     fb.persist(&mut event_loop);
+    Ok(())
 }
