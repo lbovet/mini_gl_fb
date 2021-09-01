@@ -11,14 +11,13 @@ fn main() {
         window_title: String::from("Hello world!"),
         window_size: LogicalSize::new(800.0, 600.0),
         buffer_size: Some(LogicalSize::new(2, 2)),
-        resizable: true
+        resizable: false
     }, &event_loop);
 
+    fb.change_buffer_format::<u8>(BufferFormat::RGBA);
 
-    fb.change_buffer_format::<u8>(BufferFormat::R);
-    fb.use_grayscale_shader();
-
-    let buffer = [128u8, 255, 50, 25];
+    let mut buffer = vec![[128u8, 0, 0, 34]; 4];
+    buffer[3] = [0, 0, 0, 0];
     fb.update_buffer(&buffer);
 
     // This can also be configured at creation

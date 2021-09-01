@@ -26,6 +26,9 @@ pub fn init_glutin_context<S: ToString, ET: 'static>(
     let window_size = LogicalSize::new(window_width, window_height);
 
     let window = WindowBuilder::new()
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_always_on_top(true)
         .with_title(window_title.to_string())
         .with_inner_size(window_size)
         .with_resizable(resizable);
