@@ -1,42 +1,39 @@
 #[macro_use]
 extern crate mini_gl_fb;
 
-use std::time::{Duration, Instant};
+use std::{ffi::c_void, time::{Duration, Instant}};
 
 use glutin::event::VirtualKeyCode;
-use mini_gl_fb::BufferFormat;
-use mini_gl_fb::glutin::event_loop::EventLoop;
 use mini_gl_fb::glutin::dpi::LogicalSize;
+use mini_gl_fb::glutin::event_loop::EventLoop;
+use mini_gl_fb::BufferFormat;
 
-use opencv::{
-    core::{Mat, Vec3b},
-    prelude::*,
-    Result,
-    videoio,
-};
+use opencv::{Result, core::{CV_8UC3, Mat, Vec3b, _OutputArray}, prelude::*, videoio};
 
 fn main() -> Result<()> {
-
     #[cfg(ocvrs_opencv_branch_32)]
     let mut cam = videoio::VideoCapture::new_default(0)?; // 0 is the default camera
     #[cfg(not(ocvrs_opencv_branch_32))]
     let mut cam = videoio::VideoCapture::new(0, videoio::CAP_ANY)?; // 0 is the default camera
     let opened = videoio::VideoCapture::is_opened(&cam)?;
     if !opened {
-            panic!("Unable to open default camera!");
+        panic!("Unable to open default camera!");
     }
 
     let mut event_loop = EventLoop::new();
-    let mut fb = mini_gl_fb::get_fancy(config! {
-        window_title: String::from("Hello world!"),
-        window_size: LogicalSize::new(800.0, 600.0),
-        buffer_size: Some(LogicalSize::new(640, 480)),
-        invert_y: false,
-        resizable: false
-    }, &event_loop);
+    let mut fb = mini_gl_fb::get_fancy(
+        config! {
+            window_title: String::from("Hello world!"),
+            window_size: LogicalSize::new(800.0, 600.0),
+            buffer_size: Some(LogicalSize::new(640, 480)),
+            invert_y: false,
+            resizable: false
+        },
+        &event_loop,
+    );
 
-    fb.change_buffer_format::<u8>(BufferFormat::RGBA);
-    let mut buffer = vec![0; 640*480*4];
+    fb.change_buffer_format::<u8>(BufferFormat::RGB);
+    let mut buffer: Vec<u8> = vec![0; 640 * 480 * 3];
 
     let mut update_id: Option<u32> = None;
 
@@ -44,33 +41,20 @@ fn main() -> Result<()> {
         input.wait = true;
 
         if update_id.is_none() {
-            update_id = Some(input.schedule_wakeup(Instant::now() + Duration::from_millis(5)))
+            update_id = Some(input.schedule_wakeup(Instant::now() + Duration::from_millis(15)))
         } else if let Some(mut wakeup) = input.wakeup {
             if Some(wakeup.id) == update_id {
-                let mut frame = Mat::default();
-                cam.read(&mut frame);
-                let frame_data_vec = Mat::data_typed::<Vec3b>(&frame);
-                let mut offset = 0;
-
-                if let Ok(data) = frame_data_vec {
-                    for pixel in data {
-                        let pixel_slice = &**pixel;
-                            buffer[offset] = pixel_slice[2];
-                            buffer[offset+1] = pixel_slice[1];
-                            buffer[offset+2] = pixel_slice[0];
-                            buffer[offset+3] = 128;
-                            offset += 4;
-                    }
+                unsafe {
+                       if let Ok(true) = cam.read(&mut _OutputArray::from_raw(buffer.as_ptr() as *mut c_void)) {
+                            println!("ok");
+                            fb.update_buffer(&buffer);
+                        } else {
+                            panic!("cannot read from camera");
+                        }
                 }
-
-                fb.update_buffer(&buffer);
-
-                wakeup.when = Instant::now() + Duration::from_millis(5);
-
-                input.reschedule_wakeup(wakeup);
             }
-
-            // We will get called again after all wakeups are handled
+            wakeup.when = Instant::now() + Duration::from_millis(5);
+            input.reschedule_wakeup(wakeup);
             return true;
         }
 
